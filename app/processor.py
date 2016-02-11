@@ -1,20 +1,41 @@
+import importlib
+import inspect
 import logging
+import os
 
-from plugins.debug_hook import DebugHook
-from plugins.lower import LowerCommand
-from plugins.upper import UpperCommand
-from plugins.print import PrintCommand
+from app.plugin import Hook, Command
+
+PLUGINS_DIR = 'plugins'
 
 
-def load_plugins(hooks, command_plugins):
-    # TODO: dynamically pick up commands and hooks from the plugins directory...
-    # For now we hard-code a fake "hook" and 3 fake "commands":
-    hooks.extend([DebugHook()])
-    command_plugins.extend([LowerCommand(), UpperCommand(), PrintCommand()])
+def find_plugins():
+    """Returns a list of plugin path names."""
+    for root, dirs, files in os.walk(PLUGINS_DIR):
+        for file in files:
+            if file.endswith('.py'):
+                yield os.path.join(root, file)
+
+
+def load_plugins(hook_plugins, command_plugins):
+    """Populates the plugin lists."""
+    for file in find_plugins():
+        try:
+            module_name = os.path.splitext(os.path.basename(file))[0]
+            module = importlib.import_module(PLUGINS_DIR + '.' + module_name)
+            for entry_name in dir(module):
+                entry = getattr(module, entry_name)
+                if not inspect.isclass(entry) or inspect.getmodule(entry) != module:
+                    continue
+                if issubclass(entry, Hook):
+                    hook_plugins.append(entry())
+                elif issubclass(entry, Command):
+                    command_plugins.append(entry())
+        except (ImportError, NotImplementedError):
+            continue
 
 
 def process_commands(input_obj, commands):
-    logging.debug('Processing commands...')
+    logging.debug('Processing commands')
 
     hook_plugins = []
     command_plugins = []

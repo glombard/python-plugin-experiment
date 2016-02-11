@@ -1,3 +1,8 @@
+"""
+All plugins should extend either Command or Hook.
+"""
+
+
 class PluginBase(object):
     def handle(self, input_obj):
         """
